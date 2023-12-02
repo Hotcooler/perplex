@@ -42,13 +42,16 @@ def build_db(plex_dir, movies={}):
 
     # Select only movies with year
     query = """
-        SELECT id, title, originally_available_at FROM metadata_items
-        WHERE metadata_type = 1 AND originally_available_at """
+        SELECT metadata_items.id, metadata_items.title, media_items.width, media_items.video_codec, media_items.audio_codec, metadata_items.originally_available_at FROM metadata_items INNER JOIN media_items ON metadata_items.id = media_items.metadata_item_id
+        WHERE metadata_items.metadata_type = 1 AND metadata_items.library_section_id = 7 AND metadata_items.originally_available_at  """
 
     for row in db.execute(query):
         title = convert([x for x in row[1] if x not in del_chars])
-        year = datetime.date.fromtimestamp(row[2]).strftime("%Y")
-        movies[row[0]] = (title, year, [])
+        width = row[2]
+        video = row[3]
+        audio = row[4]
+        year = datetime.date.fromtimestamp(row[5]).strftime("%Y")
+        movies[row[0]] = (title, width, video, audio, year, [])
 
     # Get files for each movie
     query = """
@@ -59,7 +62,7 @@ def build_db(plex_dir, movies={}):
     for id in movies:
         try:
             for file in db.execute(query % id):
-                movies[id][2].append(file[0])
+                movies[id][5].append(file[0])
                 files += 1
         except Exception as e:
             errorOut(e);
@@ -87,7 +90,7 @@ def convert(s):
 def build_map(movies, dest,printDoubles, directoryToRunOn = "" ,mapping=[] ):
     """ Build mapping to new names """
 
-    for title, year, files in list(movies.values()):
+    for title, width, video, audio, year, files in list(movies.values()):
         counter = 0;
         for i, old_name in enumerate(files):
             modifyedDirectory = str(directoryToRunOn).replace("\\", "/")
@@ -100,7 +103,7 @@ def build_map(movies, dest,printDoubles, directoryToRunOn = "" ,mapping=[] ):
                 print_doubles(files)
             _, ext = os.path.splitext(old_name)
 
-            template = "%s (%s)/%s (%s)" % (title, year, title, year)
+            template = "%s.(%s)/%s.(%s).%s.%s.%s" % (title, year, title, year, video, width, audio)
             template += " - part%d" % (i + 1) if len(files) > 1 else ""
             template += ext
 
